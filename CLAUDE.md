@@ -53,18 +53,18 @@ SoC = clip((T_walls - T_comfort) / (T_walls_max - T_comfort), 0, 100)
 | `thermal_floor` (heatwave, HVAC 22°C) | 23.4–23.6 °C | ✅ measured |
 | `morning_purge_rate` (fan, T_ext 21.7°C) | −1.2 °C/h | ✅ measured |
 | `coupling_bedroom_passive` | −0.075 to −0.11 °C/h | ✅ measured |
-| `roof_coupling` | ~0.45 °C/h | ⚠️ EWA on contaminated window |
-| `τ_walls` | TBD | ⏳ passive overnight experiment in progress |
+| `roof_coupling` | 0.261 °C/h | ✅ calibrated 2026-06-21 (passive nights 14–19 juin) |
+| `τ_walls` | **5.2 h** | ✅ calibrated 2026-06-21 (passive nights 14–19 juin) |
 
-**Critical note on `roof_coupling` and `τ_walls`**: calibration run on 2026-06-21 04:33 used a 48h window dominated by HVAC-on periods. `τ_walls` hit the optimizer lower bound (3h) — not physically reliable. A clean passive overnight run (no HVAC/fan/open windows) is required to properly identify τ.
+**Calibration note (2026-06-21)**: previous runs hit τ lower bound (3h) due to a bug in `residual()` — the rebound formula omitted `roof_coupling` and assumed walls at equilibrium at HVAC-off. Fixed in `calibrate.py`. Rerun on 499 points from passive nights 14–19 juin (T_ext min 14°C, strong passive cooling signal) gives τ=5.2h, roof_q=0.261°C/h.
 
 **`thermal_floor`**: in a heatwave with T_ext min ~22°C, this apartment cannot reach below 23.4°C even with continuous HVAC at setpoint 22°C. Physical limit — walls + top floor won't allow it. Knowing this changes planning.
 
 ## Current Status (as of 2026-06-21)
 
-- Passive overnight experiment running: `monitor_passive.sh` → `/tmp/monitor_passive.log` (on the NAS, separate from this repo)
-- Next step after passive data: rerun `calibrate.py` on clean window to get reliable τ_walls
-- Optimizer bounds in `calibrate.py`: `tau_walls_min=3` — if result hits this bound, data window is contaminated
+- Calibration complete: τ_walls=5.2h, roof_coupling=0.261°C/h — reliable
+- Active strategy: `monitor_day.sh` (projects/cooling-diagnostic/ in HA config repo) runs clim + fan per calibrated schedule
+- Next run: tonight 21→22 juin (first night of 36°C heatwave week)
 
 ## Topology — Apartment A (orientation confirmed by compass)
 
