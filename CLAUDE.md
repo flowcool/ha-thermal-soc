@@ -63,8 +63,13 @@ SoC = clip((T_walls - T_comfort) / (T_walls_max - T_comfort), 0, 100)
 ## Current Status (as of 2026-06-21)
 
 - Calibration complete: τ_walls=5.2h, roof_coupling=0.261°C/h — reliable
-- Active strategy: `monitor_day.sh` (projects/cooling-diagnostic/ in HA config repo) runs clim + fan per calibrated schedule
-- Next run: tonight 21→22 juin (first night of 36°C heatwave week)
+- **HA migration complete**: EWA model running natively in HA (no Python script)
+  - `packages/projet_thermal_soc.yaml` — stateful EWA via input_number + time_pattern automation
+  - `templates/sensor_thermal_soc.yaml` — SoC sensors per zone
+  - roof_q proportional to T_ext: `roof_q_eff = roof_q_base × max(0.5, T_ext / 20.0)`
+  - boot_init guard: only resets T_walls if at default (15°C), preserves state across HA restarts
+- `monitor_day.sh` abandoned — ESP IR sender unreliable, fan impact negligible
+- AC control automation: next step, blocked on ESP reliability
 
 ## Topology — Apartment A (orientation confirmed by compass)
 
