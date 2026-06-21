@@ -64,12 +64,39 @@ SoC = clip((T_walls - T_comfort) / (T_walls_max - T_comfort), 0, 100)
 
 - Calibration complete: τ_walls=5.2h, roof_coupling=0.261°C/h — reliable
 - **HA migration complete**: EWA model running natively in HA (no Python script)
-  - `packages/projet_thermal_soc.yaml` — stateful EWA via input_number + time_pattern automation
-  - `templates/sensor_thermal_soc.yaml` — SoC sensors per zone
+  - `packages/projet_thermal_soc.yaml` — stateful EWA + forecast bridge
+  - `templates/sensor_thermal_soc.yaml` — SoC sensors + predictive sensors + alarm
   - roof_q proportional to T_ext: `roof_q_eff = roof_q_base × max(0.5, T_ext / 20.0)`
-  - boot_init guard: only resets T_walls if at default (15°C), preserves state across HA restarts
-- `monitor_day.sh` abandoned — ESP IR sender unreliable, fan impact negligible
+  - boot_init guard: delay 30s + only resets T_walls if at default (15°C)
+- **Météo France** remplace met.no comme source T_ext (met.no sous-estimait de 5-7°C)
+  - entité: `weather.meteo_france_forecast_for_city_collonges_sous_saleve_rhone_alpes_74_fr_collonges_sous_saleve`
+  - `sensor.t_ext_actuelle_meteo_france` — abstraction utilisée par l'EWA
+- **Couche prédictive** (2026-06-21) :
+  - `automation.thermal_bridge_previsions_meteo_france` — toutes les 30 min, alimente 5 helpers forecast
+  - `sensor.thermal_t_walls_sejour_prevu_18h_sans_clim` — T_walls prédit à 18h sans clim (modèle EWA analytique, T_air = T_ext_max − 5°C)
+  - `sensor.thermal_temps_avant_seuil_26degc_sans_clim` — dans combien d'heures T_walls dépasse 26°C sans intervention
+  - `binary_sensor.thermal_alerte_canicule` — ON si purge bloquée (delta < 6°C) ET T_ext_max_demain ≥ 33°C
+- `input_number.thermal_walls_*` retirés de l'exclusion recorder → historique HA disponible
+- `monitor_day.sh` abandonné — ESP IR sender unreliable, fan impact negligible
 - AC control automation: next step, blocked on ESP reliability
+
+## Entités HA clés (entity_ids réels, auto-générés par HA)
+
+| Entité | Entity ID | Rôle |
+|---|---|---|
+| T_ext actuelle | `sensor.t_ext_actuelle_meteo_france` | Source EWA (MF) |
+| T_walls séjour | `input_number.thermal_walls_sejour` | État EWA |
+| SoC séjour | `sensor.thermal_soc_sejour` | SoC actuel |
+| Prédit 18h sans clim | `sensor.thermal_t_walls_sejour_prevu_18h_sans_clim` | Décision matin |
+| Temps avant 26°C | `sensor.thermal_temps_avant_seuil_26degc_sans_clim` | Urgence |
+| Alerte canicule | `binary_sensor.thermal_alerte_canicule` | Signal alarme |
+| T_ext min nuit | `input_number.forecast_t_ext_min_tonuit` | Purge possible ? |
+| T_ext max demain | `input_number.forecast_t_ext_max_demain` | Charge prévue |
+
+## Seuil purge (calibré par modèle 2026-06-21)
+
+Delta T_walls − T_ext_min_nuit ≥ **6°C** pour que la purge naturelle soit clairement meilleure que la clim.
+En dessous : la clim (thermal floor 23.5°C) refroidit mieux que l'air extérieur.
 
 ## Topology — Apartment A (orientation confirmed by compass)
 
