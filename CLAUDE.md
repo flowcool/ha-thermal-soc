@@ -107,6 +107,28 @@ Contributors add buildings via PR to `data/buildings/`.
 3. **Layer 1 (HA templates only, no Python)** — design needed, first deliverable for community
 4. **τ_walls for different construction types** — the community contribution is the core value
 
+## Runtime NAS (Collonges / UGreen DXP4800PLUS)
+
+Le `python3` système n'a pas les modules nécessaires. Utiliser le venv pipx :
+
+```bash
+PYTHON=/home/flow/.local/pipx/venvs/homeassistant-cli/bin/python3
+
+# Calibration depuis HA live
+HASS_TOKEN=$(grep HASS_TOKEN ~/.bashrc | cut -d'"' -f2) \
+  $PYTHON src/calibrate.py --config config/my_collonges.yaml
+
+# Calibration depuis CSV local
+$PYTHON src/calibrate.py --config config/my_collonges.yaml --csv data/passive_collonges.csv
+
+# Monitor passif
+HASS_TOKEN=$(grep HASS_TOKEN ~/.bashrc | cut -d'"' -f2) \
+  nohup $PYTHON src/monitor.py --config config/my_collonges.yaml >> /tmp/tsoc_monitor.log 2>&1 &
+# Arrêt : touch /tmp/tsoc_stop
+```
+
+scipy/matplotlib/pyyaml installés dans ce venv le 2026-06-21.
+
 ## Context: why this project exists separately from the HA config repo
 
 This is a standalone open-source Python project, not a HA configuration. The HA config repo (`flowcool/homeassistant-config`) has its own CLAUDE.md with Z2M conventions, Alarmo rules, Fairway project constraints, etc. — none of that applies here.
