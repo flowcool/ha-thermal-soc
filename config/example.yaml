@@ -1,0 +1,49 @@
+# ha-thermal-soc — configuration example
+# Copy to config/my_home.yaml and adapt
+
+hass:
+  url: "http://localhost:8123"
+  # token: set HASS_TOKEN environment variable (never put credentials here)
+
+# Temperature sensors — one per zone
+# Add or remove zones to match your home
+zones:
+  living_room:
+    entity_id: sensor.living_room_temperature
+    label: "Living Room"
+  bedroom_main:
+    entity_id: sensor.bedroom_temperature
+    label: "Main Bedroom"
+  # bedroom_2:
+  #   entity_id: sensor.bedroom_2_temperature
+  #   label: "Bedroom 2"
+
+# Outdoor temperature — weather entity attribute
+weather_entity: weather.home
+
+# History window for calibration (hours)
+history_hours: 48
+
+# EWA model — calibration bounds
+calibration:
+  tau_walls_min: 3      # hours — lower bound (very reactive walls)
+  tau_walls_max: 80     # hours — upper bound (very inert walls, e.g. stone castle)
+  roof_coupling_max: 2  # °C/h — upper bound (0 if no roof/top-floor effect)
+
+# Calibration observables — measured on your building
+# Run monitor.py for 24h with HVAC on at a fixed setpoint, then measure:
+observables:
+  hvac_setpoint: 22.0         # °C — setpoint used during measurement period
+  thermal_floor: 23.5         # °C — air temp plateau reached with HVAC at setpoint
+  rebound_rate: 0.7           # °C/h — air temp rise rate just after HVAC off
+  t_ext_during_plateau: 23.0  # °C — outdoor temp during plateau measurement
+
+# SoC normalisation
+soc:
+  t_comfort: 22.0    # °C — "fully discharged" reference (0% SoC)
+  t_walls_max: 30.0  # °C — "fully charged" reference (100% SoC)
+
+# Monitor — passive logging
+monitor:
+  interval_seconds: 300   # 5 minutes
+  output_csv: "data/passive_log.csv"

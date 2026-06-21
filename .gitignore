@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.env
+config/my_*.yaml
+data/passive_log.csv
+data/*.csv
+plots/*.png
+plots/*.txt
