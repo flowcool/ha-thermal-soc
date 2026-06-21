@@ -128,6 +128,10 @@ def calibrate(T_air: np.ndarray, t_h: np.ndarray, cfg: dict, zone_label: str) ->
     hvac_setpoint  = obs["hvac_setpoint"]
     thermal_floor  = obs["thermal_floor"]
     rebound_rate   = obs["rebound_rate"]
+    # T_walls at HVAC-off moment (measured or estimated). Defaults to thermal_floor + 2°C
+    # because walls are warmer than air equilibrium when HVAC stops.
+    t_walls_at_hvac_off = obs.get("t_walls_at_hvac_off", thermal_floor + 2.0)
+    t_air_at_hvac_off   = obs.get("t_air_at_hvac_off",   hvac_setpoint + 0.2)
 
     tau_min = cal.get("tau_walls_min", 3)
     tau_max = cal.get("tau_walls_max", 80)
@@ -142,8 +146,9 @@ def calibrate(T_air: np.ndarray, t_h: np.ndarray, cfg: dict, zone_label: str) ->
         # Observable 1: thermal plateau = hvac_setpoint + roof_q * tau
         plateau_pred = hvac_setpoint + roof_q * tau
         r1 = (plateau_pred - thermal_floor) ** 2
-        # Observable 2: rebound rate = (thermal_floor - hvac_setpoint) / tau
-        rebound_pred = (thermal_floor - hvac_setpoint) / tau
+        # Observable 2: rebound rate after HVAC-off
+        # total_rebound = (T_walls_at_off - T_air_at_off) / tau + roof_q
+        rebound_pred = (t_walls_at_hvac_off - t_air_at_hvac_off) / tau + roof_q
         r2 = (rebound_pred - rebound_rate) ** 2 * 10
         # Observable 3: data likelihood (post spin-up)
         if len(T_air) > spinup_idx + 10:
@@ -162,7 +167,8 @@ def calibrate(T_air: np.ndarray, t_h: np.ndarray, cfg: dict, zone_label: str) ->
     print(f"  tau_walls     = {tau:.1f} h")
     print(f"  roof_coupling = {roof_q:.3f} °C/h")
     print(f"  plateau pred  = {hvac_setpoint + roof_q * tau:.1f}°C  (observed: {thermal_floor}°C)")
-    print(f"  rebound pred  = +{(thermal_floor - hvac_setpoint) / tau:.2f}°C/h  (observed: +{rebound_rate}°C/h)")
+    rebound_pred_print = (t_walls_at_hvac_off - t_air_at_hvac_off) / tau + roof_q
+    print(f"  rebound pred  = +{rebound_pred_print:.2f}°C/h  (observed: +{rebound_rate}°C/h)")
     if abs(tau - tau_min) < 0.1:
         print(f"  ⚠  tau hit lower bound ({tau_min}h) — passive data window may be too short or contaminated")
 
