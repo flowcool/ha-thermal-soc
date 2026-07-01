@@ -105,13 +105,31 @@ Solves the inverse problem: *"when do I need to start HVAC to reach comfort by m
 - [x] EWA calibrator (`src/calibrate.py`)
 - [x] Passive monitor (`src/monitor.py`)
 - [x] Wall simulation plots (`src/visualize.py`)
-- [x] Calibrated on one apartment (concrete, top floor, Alpine foothills)
-- [ ] Passive calibration experiment in progress (first clean overnight run)
+- [x] Calibrated on one apartment (concrete, top floor, Alpine foothills) — τ_walls=5.2h, roof_coupling=0.261°C/h
+- [x] Layer 1 HA template sensors (YAML) — running natively in production, zero Python, 24/7
+- [x] Prediction/reality reconciliation layer — forecast-based projection cross-checked against live measurement (see field validation below)
 - [ ] Validated on multiple building types
-- [ ] Layer 1 HA template sensors (YAML)
 - [ ] HA custom component (HACS)
 
-**This is early-stage research.** We have one calibrated building and a working calibration pipeline. We need more buildings to validate the concept.
+**This is early-stage research.** We have one calibrated building running the model continuously in production, and a working calibration pipeline. We need more buildings to validate the concept.
+
+---
+
+## Field validation: a real bug caught in production
+
+The HA-native version (Layer 1 — template sensors + automations, no Python) has been running for about 10 days on Apartment A. It just caught something worth sharing.
+
+The "recommend AC start time" sensor combines two inputs: the live EWA-estimated wall temperature, and today's forecasted outdoor max — pulled once in the morning from the weather integration's hourly forecast and expected to stay fixed for the rest of the day.
+
+It doesn't. The extraction logic scans the weather integration's *remaining* hourly forecast entries for "today, 7am–10pm." By early evening, none of those hours are in the future anymore — the forecast API only ever returns what's ahead of now. The scan finds nothing, and the template silently falls back to a hardcoded default instead of keeping the value it correctly computed that morning. Every evening, any downstream sensor relying on "today's forecast max" quietly got corrupted — no error, no state that looks obviously wrong, just a wrong number feeding a real decision.
+
+This is a general trap for any HA template that reasons about "today's forecast" late in the day using a rolling hourly forecast entity: the data window for "today" runs out before the day does.
+
+**Fix, in two parts:**
+1. Preserve the last known-good value instead of resetting to a magic constant when the scan finds nothing.
+2. More importantly for TSOC specifically: stop trusting the forecast alone. A second helper now tracks the actual *observed* outdoor max so far today (ratcheting, reset at midnight), and every downstream calculation uses `max(forecast, observed)`. A `binary_sensor` flags when live conditions already exceed the morning forecast by more than a configurable margin — which is exactly the situation that exposed this bug (a mild-looking morning forecast, a warmer-than-expected real day).
+
+Small bug, but a clean illustration of the project's core argument: forecast-only, "compute once and trust it" logic is fragile. Reconciling prediction against live measurement — the same principle behind the EWA model itself — is what catches this kind of silent drift.
 
 ---
 
@@ -126,8 +144,8 @@ Solves the inverse problem: *"when do I need to start HVAC to reach comfort by m
 | `hvac_rate` (heatwave, sun on facade) | −0.84 °C/h → plateau | HVAC at 22°C, T_ext 31°C, afternoon sun |
 | `solar_gain` (NE bedroom, direct) | +0.55 °C/h | Morning sun, door closed |
 | `thermal_floor` (heatwave, HVAC on) | 23.4–23.6 °C | Minimum reachable with HVAC at 22°C, T_ext min 22°C |
-| `roof_coupling` | ~0.45 °C/h | EWA calibration (top-floor heat flux) |
-| `τ_walls` | TBD | Passive overnight experiment in progress |
+| `roof_coupling` | 0.261 °C/h | EWA calibration, 499 pts over passive nights (top-floor heat flux) |
+| `τ_walls` | 5.2 h | EWA calibration, passive nights, T_ext min 14°C |
 
 The `thermal_floor` finding is key: in a heatwave with T_ext minimum 22°C, this apartment cannot reach below 23.4°C even with continuous HVAC. The walls — and the floor above — won't allow it. Knowing this in advance changes how you plan.
 

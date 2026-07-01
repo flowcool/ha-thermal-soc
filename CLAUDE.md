@@ -60,7 +60,7 @@ SoC = clip((T_walls - T_comfort) / (T_walls_max - T_comfort), 0, 100)
 
 **`thermal_floor`**: in a heatwave with T_ext min ~22°C, this apartment cannot reach below 23.4°C even with continuous HVAC at setpoint 22°C. Physical limit — walls + top floor won't allow it. Knowing this changes planning.
 
-## Current Status (as of 2026-06-21)
+## Current Status (as of 2026-07-01)
 
 - Calibration complete: τ_walls=5.2h, roof_coupling=0.261°C/h — reliable
 - **HA migration complete**: EWA model running natively in HA (no Python script)
@@ -80,6 +80,20 @@ SoC = clip((T_walls - T_comfort) / (T_walls_max - T_comfort), 0, 100)
 - `monitor_day.sh` abandonné — ESP IR sender unreliable, fan impact negligible
 - AC control automation: next step, blocked on ESP reliability
 
+## Couche réconciliation prévision/réel (2026-07-01)
+
+Bug trouvé en production : `forecast_t_ext_max_aujourd_hui` (extrait du forecast horaire Météo France, fenêtre "aujourd'hui 7h-22h") retombait sur un défaut arbitraire (30°C) dès que le forecast n'avait plus d'heures futures dans cette fenêtre — donc chaque soir, écrasant silencieusement la vraie valeur calculée le matin. Aucune erreur visible, juste un chiffre faux qui alimentait la reco de démarrage clim.
+
+Fix en 2 parties :
+- `thermal_forecast_bridge` : si aucune heure ne matche la fenêtre, conserve la dernière valeur connue au lieu de reset sur le défaut.
+- Nouvelle couche de réconciliation, indépendante du fix ci-dessus : ne plus faire confiance à la seule prévision matinale.
+  - `input_number.thermal_t_ext_max_observe_aujourd_hui` — max T_ext réel observé depuis minuit, ratchet mis à jour /10min (dans `maison_thermal_walls_update`), reset à minuit (`thermal_reset_observe_quotidien`)
+  - `sensor.thermal_t_ext_max_effectif_aujourd_hui` = `max(forecast, observé)` — remplace la prévision figée dans "Heure démarrage clim recommandée" et "Temps avant seuil"
+  - `binary_sensor.thermal_divergence_previsions` — on si T_ext réelle dépasse la prévision matinale de plus de `input_number.thermal_divergence_seuil` (2°C par défaut), fenêtre 9h-16h
+  - Notifications (`automations.yaml`, repo HA config privé, pas ici) : alerte précoce sur divergence + alerte unique sur transition vers "maintenant"
+
+Découverte collatérale : il existe déjà une alerte confort générique par pièce (blueprint `pattern_surveillance_th.yaml`, seuil 26°C/30min, cooldown 6h) — indépendante de TSOC, elle s'est bien déclenchée le jour de l'incident. Le vrai manque était côté couche *prédictive* (aucune notification liée à SoC/reco clim), pas côté réactif.
+
 ## Entités HA clés (entity_ids réels, auto-générés par HA)
 
 | Entité | Entity ID | Rôle |
@@ -92,6 +106,8 @@ SoC = clip((T_walls - T_comfort) / (T_walls_max - T_comfort), 0, 100)
 | Alerte canicule | `binary_sensor.thermal_alerte_canicule` | Signal alarme |
 | T_ext min nuit | `input_number.forecast_t_ext_min_tonuit` | Purge possible ? |
 | T_ext max demain | `input_number.forecast_t_ext_max_demain` | Charge prévue |
+| T_ext max effectif aujourd'hui | `sensor.thermal_t_ext_max_effectif_aujourd_hui` | max(prévu, observé réel) |
+| Divergence prévision/réel | `binary_sensor.thermal_divergence_previsions` | Réel > prévu du matin ? |
 
 ## Seuil purge (calibré par modèle 2026-06-21)
 
