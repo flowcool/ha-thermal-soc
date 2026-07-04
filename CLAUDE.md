@@ -7,7 +7,7 @@ Open-source Python project: **Thermal State of Charge (TSOC)** for buildings.
 Core idea: a building stores heat like a battery. This project exposes its state of charge as a Home Assistant virtual sensor (`sensor.thermal_soc`, 0–100%), enabling predictive HVAC decisions instead of reactive thermostat control.
 
 GitHub: https://github.com/flowcool/ha-thermal-soc  
-Local path: `/home/flow/ha-thermal-soc/`
+Local path: `/home/flow/claude_project/ha-thermal-soc/`
 
 ## Architecture
 
@@ -182,3 +182,20 @@ scipy/matplotlib/pyyaml installés dans ce venv le 2026-06-21.
 This is a standalone open-source Python project, not a HA configuration. The HA config repo (`flowcool/homeassistant-config`) has its own CLAUDE.md with Z2M conventions, Alarmo rules, Fairway project constraints, etc. — none of that applies here.
 
 This project uses HA as a *data source* (API) but is otherwise independent.
+
+## HA Integration Output Lives In a Different Git Repo — Commit There Separately
+
+The "HA migration" (EWA model running natively in HA, see Current Status above) writes and edits files that live in **`flowcool/homeassistant-config`**, a completely separate git repository — not this one. On this NAS it's checked out at:
+
+```
+/volume1/docker/homeassistant/homeassistant/     (source of truth, also the HA /config dir — edits are live)
+/home/flow/claude_project/homeassistant/         (symlink to the same repo, if working from claude_project/)
+```
+
+Files owned by the HA migration, physically living in *that* repo, not this one:
+- `packages/projet_thermal_soc.yaml`
+- `templates/sensor_thermal_soc.yaml`
+- `configuration.yaml` (recorder include/exclude entries for `input_number.thermal_walls_*`)
+- any `automations.yaml` notification wiring for TSOC alerts (divergence, canicule, clim reco)
+
+**A `git commit` run from this project's root never touches those files** — they are outside this git root entirely, in a sibling repo. Any session that edits HA-side integration files here must separately `cd` into the homeassistant-config repo and commit there too, following *that* repo's own CLAUDE.md conventions (branch-then-merge for structural work, French commit messages, 1 commit per logical task, no force-push). Skipping this step leaves real production HA config silently uncommitted — this has already happened once (2026-07-01 to 2026-07-04 changes sat uncommitted for 3 days until caught during an unrelated session in that repo).
