@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "command": ".claude/hooks/ha-cross-repo-warning.sh"
+      }
+    ]
+  }
+}
