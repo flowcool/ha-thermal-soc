@@ -9,7 +9,7 @@ The HA migration writes files that live in **`flowcool/homeassistant-config`**, 
 ## Paths (same physical location)
 
 ```
-/volume1/docker/homeassistant/homeassistant/     (source of truth, = HA /config)
+/volume1/home-assistant/homeassistant/config/     (source of truth, = HA /config)
 /home/flow/claude_project/homeassistant/         (symlink to same)
 ```
 
