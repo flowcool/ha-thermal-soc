@@ -1,0 +1,96 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 6 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  syntax:
+    name: Configuration syntax
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install PyYAML==6.0.3
+      - name: Parse tracked configuration without resolving secrets or includes
+        run: |
+          python - <<'PY'
+          import ast
+          import json
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          import yaml
+
+          names = subprocess.check_output(["git", "ls-files", "-z"]).decode().split("\0")
+          failed = False
+          checked = 0
+          for name in filter(None, names):
+              path = Path(name)
+              if path.suffix not in {".yaml", ".yml", ".json", ".py", ".sh"}:
+                  continue
+              checked += 1
+              try:
+                  content = path.read_text(encoding="utf-8-sig")
+                  if path.suffix in {".yaml", ".yml"}:
+                      for _ in yaml.parse(content):
+                          pass
+                  elif path.suffix == ".json":
+                      json.loads(content)
+                  elif path.suffix == ".py":
+                      ast.parse(content, filename=name)
+                  else:
+                      result = subprocess.run(["bash", "-n", name], capture_output=True)
+                      if result.returncode:
+                          raise ValueError("Invalid shell syntax")
+              except (OSError, UnicodeError, ValueError, SyntaxError, yaml.YAMLError):
+                  # Do not print source lines: configuration can contain credentials.
+                  print(f"Invalid syntax: {name}", file=sys.stderr)
+                  failed = True
+          print(f"Checked {checked} tracked files.")
+          sys.exit(1 if failed or checked == 0 else 0)
+          PY
+  dependency-audit:
+    name: Python dependency audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r .github/requirements-security.txt
+      - run: pip-audit -r requirements.txt --progress-spinner off
+      - run: pip-audit -r .github/requirements-security.txt --progress-spinner off
+  code-security:
+    name: Python code security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r .github/requirements-security.txt
+      - run: bandit -q -r src -lll
