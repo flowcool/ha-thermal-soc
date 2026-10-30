@@ -26,7 +26,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.15"
       - run: python -m pip install PyYAML==6.0.3
       - name: Parse tracked configuration without resolving secrets or includes
         run: |
@@ -77,7 +77,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.15"
       - run: python -m pip install -r .github/requirements-security.txt
       - run: pip-audit -r requirements.txt --progress-spinner off
       - run: pip-audit -r .github/requirements-security.txt --progress-spinner off
@@ -91,6 +91,6 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.15"
       - run: python -m pip install -r .github/requirements-security.txt
       - run: bandit -q -r src -lll
